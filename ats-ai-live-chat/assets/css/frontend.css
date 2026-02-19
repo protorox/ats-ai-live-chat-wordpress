@@ -1,0 +1,235 @@
+#ats-chat-widget {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 99999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#ats-chat-widget * {
+  box-sizing: border-box;
+}
+
+.ats-chat-toggle {
+  width: 62px;
+  height: 62px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0b1f3a, #1274ff);
+  color: #fff;
+  box-shadow: 0 16px 36px rgba(18, 116, 255, 0.35);
+  cursor: pointer;
+}
+
+.ats-chat-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ats-chat-panel {
+  position: absolute;
+  right: 0;
+  bottom: 76px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: 78vh;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.24);
+}
+
+.ats-chat-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px;
+  border-bottom: 1px solid #eef2f7;
+  background: #f8fafc;
+}
+
+.ats-chat-panel-header strong {
+  color: #0f172a;
+}
+
+.ats-chat-panel-subtitle {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ats-chat-close {
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+  color: #64748b;
+  line-height: 1;
+}
+
+.ats-chat-cookie-notice {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #334155;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.ats-chat-messages {
+  padding: 10px;
+  min-height: 220px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: #f9fbfd;
+}
+
+.ats-chat-message {
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ats-chat-message-visitor {
+  align-items: flex-end;
+}
+
+.ats-chat-message-agent,
+.ats-chat-message-ai,
+.ats-chat-message-system {
+  align-items: flex-start;
+}
+
+.ats-chat-bubble {
+  max-width: 90%;
+  border-radius: 12px;
+  padding: 9px 11px;
+  line-height: 1.4;
+  font-size: 14px;
+  background: #edf2ff;
+  color: #0f172a;
+  white-space: pre-wrap;
+}
+
+.ats-chat-message-visitor .ats-chat-bubble {
+  background: #1274ff;
+  color: #fff;
+}
+
+.ats-chat-meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.ats-chat-typing {
+  font-size: 12px;
+  color: #64748b;
+  padding: 6px 12px;
+  min-height: 24px;
+}
+
+.ats-chat-composer {
+  border-top: 1px solid #eef2f7;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  background: #fff;
+}
+
+.ats-chat-composer textarea,
+.ats-chat-offline input,
+.ats-chat-offline textarea {
+  width: 100%;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  padding: 9px;
+  resize: vertical;
+  font-size: 14px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.ats-chat-send {
+  background: #1274ff;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 600;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.ats-chat-offline {
+  border-top: 1px solid #eef2f7;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.ats-chat-offline h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ats-chat-offline p {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ats-chat-product-card {
+  background: #fff;
+  border: 1px solid #dbe3ef;
+}
+
+.ats-chat-product-card img {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.ats-chat-product-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ats-chat-product-price {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.ats-chat-product-card p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.ats-chat-product-card a {
+  color: #1274ff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  #ats-chat-widget {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .ats-chat-panel {
+    width: calc(100vw - 20px);
+    right: 0;
+    bottom: 72px;
+    max-height: 80vh;
+  }
+
+  .ats-chat-messages {
+    max-height: 45vh;
+  }
+}

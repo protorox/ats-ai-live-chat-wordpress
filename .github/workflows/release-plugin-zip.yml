@@ -1,0 +1,28 @@
+name: Build Plugin Zip
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build zip
+        run: |
+          zip -r ats-ai-live-chat.zip ats-ai-live-chat -x "*.DS_Store" "*.git*"
+
+      - name: Upload zip to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ats-ai-live-chat.zip
+          overwrite_files: true
