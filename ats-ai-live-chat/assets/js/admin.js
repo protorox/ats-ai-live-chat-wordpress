@@ -6,6 +6,7 @@
   }
 
   var config = window.ATSLiveChatAdmin;
+  var restBase = normalizeRestBase(config.restBase || '');
 
   var state = {
     visitors: [],
@@ -29,6 +30,10 @@
   }
 
   function api(path, method, payload) {
+    if (!restBase) {
+      return Promise.reject(new Error('REST base URL is not configured.'));
+    }
+
     var opts = {
       method: method || 'GET',
       credentials: 'same-origin',
@@ -42,7 +47,7 @@
       opts.body = JSON.stringify(payload);
     }
 
-    return fetch(config.restBase + path, opts).then(function (res) {
+    return fetch(restBase + path, opts).then(function (res) {
       return res.json().then(function (json) {
         if (!res.ok) {
           var msg = json && json.message ? json.message : 'Request failed';
@@ -51,6 +56,39 @@
         return json;
       });
     });
+  }
+
+  function normalizeRestBase(base) {
+    if (!base || typeof base !== 'string') {
+      return '';
+    }
+
+    try {
+      var parsed = new URL(base, window.location.origin);
+      parsed.protocol = window.location.protocol;
+      parsed.host = window.location.host;
+      return parsed.toString().replace(/\/+$/, '');
+    } catch (e) {
+      return base.replace(/\/+$/, '');
+    }
+  }
+
+  function setTopError(message) {
+    if (!message) {
+      return;
+    }
+
+    if (!els.errorBar) {
+      els.errorBar = document.createElement('div');
+      els.errorBar.className = 'notice notice-error ats-chat-admin-error';
+      els.errorBar.style.margin = '10px 0';
+      var wrap = document.querySelector('.ats-chat-admin-wrap');
+      if (wrap) {
+        wrap.insertBefore(els.errorBar, wrap.firstChild.nextSibling);
+      }
+    }
+
+    els.errorBar.textContent = 'ATS Live Chat error: ' + message;
   }
 
   function formatAgo(seconds) {
@@ -308,6 +346,7 @@
       })
       .catch(function (err) {
         console.error('[ATS Chat admin] messages error:', err.message);
+        setTopError(err.message);
       });
   }
 
@@ -331,6 +370,7 @@
       })
       .catch(function (err) {
         console.error('[ATS Chat admin] conversation error:', err.message);
+        setTopError(err.message);
       });
   }
 
@@ -396,6 +436,7 @@
       })
       .catch(function (err) {
         console.error('[ATS Chat admin] visitors error:', err.message);
+        setTopError(err.message);
       });
   }
 

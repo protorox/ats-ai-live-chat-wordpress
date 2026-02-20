@@ -6,6 +6,7 @@
   }
 
   var config = window.ATSLiveChat;
+  var restBase = normalizeRestBase(config.restBase || '');
   var state = {
     visitorId: '',
     conversationId: '',
@@ -88,6 +89,10 @@
   }
 
   function api(path, method, payload) {
+    if (!restBase) {
+      return Promise.reject(new Error('REST base URL is not configured.'));
+    }
+
     var opts = {
       method: method || 'GET',
       headers: {
@@ -101,7 +106,7 @@
       opts.body = JSON.stringify(payload);
     }
 
-    return fetch(config.restBase + path, opts).then(function (res) {
+    return fetch(restBase + path, opts).then(function (res) {
       return res.json().then(function (json) {
         if (!res.ok) {
           var msg = (json && json.message) ? json.message : 'Request failed';
@@ -110,6 +115,22 @@
         return json;
       });
     });
+  }
+
+  function normalizeRestBase(base) {
+    if (!base || typeof base !== 'string') {
+      return '';
+    }
+
+    try {
+      var parsed = new URL(base, window.location.origin);
+      // Force same-origin to avoid staging proxy mixed-content/cross-origin issues.
+      parsed.protocol = window.location.protocol;
+      parsed.host = window.location.host;
+      return parsed.toString().replace(/\/+$/, '');
+    } catch (e) {
+      return base.replace(/\/+$/, '');
+    }
   }
 
   function renderTextMessage(message) {
@@ -219,6 +240,17 @@
     els.offline.style.display = 'none';
   }
 
+  function showSystemNotice(text) {
+    var notice = {
+      message_id: 'system-' + Date.now(),
+      sender_type: 'system',
+      message_type: 'text',
+      content_text: text || 'Connection issue. Please try again.',
+      ts: Math.floor(Date.now() / 1000)
+    };
+    appendMessage(notice);
+  }
+
   function sendPresence() {
     return api('/presence', 'POST', {
       nonce: config.nonce,
@@ -258,6 +290,7 @@
       .catch(function (err) {
         // Keep the widget usable even if presence fails temporarily.
         console.error('[ATS Chat] presence error:', err.message);
+        showSystemNotice('Chat is having trouble connecting. Please refresh this page.');
       });
   }
 
@@ -318,6 +351,7 @@
       })
       .catch(function (err) {
         console.error('[ATS Chat] send message error:', err.message);
+        showSystemNotice('Message could not be sent right now. Please try again.');
       });
   }
 
