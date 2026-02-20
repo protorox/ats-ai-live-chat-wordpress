@@ -338,14 +338,14 @@
     if (getSession(sessionKey) === serverBuild) {
       showUpdateRequired((config.strings.updateRequiredManual || 'Update required. Clear cache and refresh.') +
         ' (server: ' + serverBuild + ', loaded: ' + clientBuild + ')');
-      return true;
+      return false;
     }
 
     showUpdateRequired((config.strings.updateRequired || 'Update required. New chat build detected. Refreshing…') +
       ' (server: ' + serverBuild + ', loaded: ' + clientBuild + ')');
     setSession(sessionKey, serverBuild);
     forceReloadForBuild(serverBuild);
-    return true;
+    return false;
   }
 
   function sendPresence() {
