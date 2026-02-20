@@ -45,6 +45,22 @@ class ATS_Chat_GitHub_Updater {
 
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_updates' ) );
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 20, 3 );
+		add_filter( 'auto_update_plugin', array( $this, 'force_auto_update' ), 20, 2 );
+	}
+
+	/**
+	 * Force automatic updates for this plugin when an update is available.
+	 *
+	 * @param bool  $update Whether to auto-update.
+	 * @param mixed $item Update item object.
+	 * @return bool
+	 */
+	public function force_auto_update( $update, $item ) {
+		if ( is_object( $item ) && ! empty( $item->plugin ) && $this->plugin_basename === $item->plugin ) {
+			return true;
+		}
+
+		return (bool) $update;
 	}
 
 	/**
@@ -163,7 +179,7 @@ class ATS_Chat_GitHub_Updater {
 			return array();
 		}
 
-		set_site_transient( $cache_key, $response, 5 * MINUTE_IN_SECONDS );
+		set_site_transient( $cache_key, $response, MINUTE_IN_SECONDS );
 		return $response;
 	}
 
@@ -267,7 +283,8 @@ class ATS_Chat_GitHub_Updater {
 	/**
 	 * Updater configuration.
 	 *
-	 * Set constants in wp-config.php or use filter:
+	 * Set constants in wp-config.php or use filter. If not set, defaults to
+	 * this plugin's canonical repo.
 	 * - ATS_CHAT_GITHUB_REPO: "owner/repo"
 	 * - ATS_CHAT_GITHUB_TOKEN: optional token for private repos
 	 *
@@ -275,7 +292,7 @@ class ATS_Chat_GitHub_Updater {
 	 */
 	private function get_config() {
 		$config = array(
-			'repo'  => defined( 'ATS_CHAT_GITHUB_REPO' ) ? (string) ATS_CHAT_GITHUB_REPO : '',
+			'repo'  => defined( 'ATS_CHAT_GITHUB_REPO' ) ? (string) ATS_CHAT_GITHUB_REPO : 'protorox/ats-ai-live-chat-wordpress',
 			'token' => defined( 'ATS_CHAT_GITHUB_TOKEN' ) ? (string) ATS_CHAT_GITHUB_TOKEN : '',
 		);
 

@@ -1,4 +1,4 @@
-# ATS AI Live Chat (Version 1.1.7 working)
+# ATS AI Live Chat (Version 1.1.8 working)
 
 Self-hosted live chat plugin for WordPress 6.x with:
 
@@ -57,8 +57,10 @@ Self-hosted live chat plugin for WordPress 6.x with:
 
 This plugin now supports auto-updates from GitHub Releases.
 
-1. Put this plugin code in a GitHub repo (public or private).
-2. Configure WordPress with your repo in `wp-config.php`:
+1. Keep this repo connected to your WordPress site.
+2. Push changes to `main`. GitHub Actions auto-bumps patch version, tags, builds zip, and publishes a release.
+3. The plugin updater checks GitHub releases and auto-updates this plugin in WordPress.
+4. Optional override: set a different repo in `wp-config.php`:
 
 ```php
 define( 'ATS_CHAT_GITHUB_REPO', 'YOUR_GITHUB_USERNAME/YOUR_REPO_NAME' );
@@ -66,6 +68,5 @@ define( 'ATS_CHAT_GITHUB_REPO', 'YOUR_GITHUB_USERNAME/YOUR_REPO_NAME' );
 define( 'ATS_CHAT_GITHUB_TOKEN', 'ghp_xxxxxxxxxxxxxxxxxxxx' );
 ```
 
-3. Publish GitHub releases with tags matching plugin version (example `v1.1.0`).
-4. Attach a zip asset named `ats-ai-live-chat.zip` that contains top-level folder `ats-ai-live-chat/`.
-5. WordPress update checks will detect the new release and show update in Plugins screen.
+5. If your repo is private, set `ATS_CHAT_GITHUB_TOKEN`.
+6. Auto-updates still depend on WordPress cron/update checks. This plugin reduces GitHub cache to 1 minute for faster detection.

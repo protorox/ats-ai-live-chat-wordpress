@@ -1,0 +1,78 @@
+name: Auto Release On Main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect plugin changes and bump version
+        id: bump
+        run: |
+          set -euo pipefail
+
+          BEFORE_SHA="${{ github.event.before }}"
+          AFTER_SHA="${{ github.sha }}"
+
+          if [ -z "${BEFORE_SHA}" ] || [ "${BEFORE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+            CHANGED="$(git show --pretty='' --name-only "${AFTER_SHA}" | grep '^ats-ai-live-chat/' || true)"
+          else
+            CHANGED="$(git diff --name-only "${BEFORE_SHA}" "${AFTER_SHA}" | grep '^ats-ai-live-chat/' || true)"
+          fi
+
+          if [ -z "${CHANGED}" ]; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          CURRENT_VERSION="$(grep -E '^\s*\*\sVersion:\s*[0-9]+\.[0-9]+\.[0-9]+' ats-ai-live-chat/ats-ai-live-chat.php | sed -E 's/^\s*\*\sVersion:\s*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n1)"
+
+          if [ -z "${CURRENT_VERSION}" ]; then
+            echo "Could not detect current plugin version."
+            exit 1
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT_VERSION}"
+          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+
+          sed -i "s/^ \* Version: ${CURRENT_VERSION}$/ * Version: ${NEXT_VERSION}/" ats-ai-live-chat/ats-ai-live-chat.php
+          sed -i "s/define( 'ATS_CHAT_VERSION', '${CURRENT_VERSION}' );/define( 'ATS_CHAT_VERSION', '${NEXT_VERSION}' );/" ats-ai-live-chat/ats-ai-live-chat.php
+          sed -i "1s/Version ${CURRENT_VERSION} working/Version ${NEXT_VERSION} working/" ats-ai-live-chat/README.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ats-ai-live-chat/ats-ai-live-chat.php ats-ai-live-chat/README.md
+          git commit -m "chore(release): v${NEXT_VERSION} [skip ci]"
+          git tag "v${NEXT_VERSION}"
+          git push origin HEAD:main
+          git push origin "v${NEXT_VERSION}"
+
+          echo "changed=true" >> "${GITHUB_OUTPUT}"
+          echo "version=${NEXT_VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build zip
+        if: steps.bump.outputs.changed == 'true'
+        run: |
+          zip -r ats-ai-live-chat.zip ats-ai-live-chat -x "*.DS_Store" "*.git*"
+
+      - name: Create release
+        if: steps.bump.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version }}
+          name: v${{ steps.bump.outputs.version }}
+          files: ats-ai-live-chat.zip
+          generate_release_notes: true
