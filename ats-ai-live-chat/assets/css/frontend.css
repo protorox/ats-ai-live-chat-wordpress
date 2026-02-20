@@ -66,6 +66,15 @@
   color: #64748b;
 }
 
+.ats-chat-update-required {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #5b4300;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0e1bb;
+  background: #fff8e8;
+}
+
 .ats-chat-close {
   border: 0;
   background: transparent;

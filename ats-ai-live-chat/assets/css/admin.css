@@ -24,6 +24,17 @@
   padding: 3px 10px;
 }
 
+.ats-chat-update-required {
+  margin: 12px 0 0;
+  border: 1px solid #f2d4a4;
+  background: #fff8e5;
+  color: #5b4300;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .ats-chat-left,
 .ats-chat-right {
   background: #fff;

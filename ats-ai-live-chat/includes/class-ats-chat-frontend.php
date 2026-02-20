@@ -53,6 +53,7 @@ class ATS_Chat_Frontend {
 			array(
 				'restBase'      => esc_url_raw( rest_url( 'ats-chat/v1' ) ),
 				'nonce'         => wp_create_nonce( 'ats_chat_public' ),
+				'pluginVersion' => ATS_CHAT_VERSION,
 				'siteName'      => get_bloginfo( 'name' ),
 				'visitorName'   => $name,
 				'visitorEmail'  => $email,
@@ -72,6 +73,8 @@ class ATS_Chat_Frontend {
 					'leadSend'          => __( 'Send request', 'ats-ai-live-chat' ),
 					'typingAgent'       => __( 'Agent is typing…', 'ats-ai-live-chat' ),
 					'thanks'            => __( 'Thanks! We received your message.', 'ats-ai-live-chat' ),
+					'updateRequired'    => __( 'Update required. New chat build detected. Refreshing…', 'ats-ai-live-chat' ),
+					'updateRequiredManual' => __( 'Update required. Please clear cache and refresh this page.', 'ats-ai-live-chat' ),
 				),
 			)
 		);
@@ -103,6 +106,7 @@ class ATS_Chat_Frontend {
 					</div>
 					<button type="button" id="ats-chat-close" class="ats-chat-close" aria-label="<?php esc_attr_e( 'Close chat', 'ats-ai-live-chat' ); ?>">×</button>
 				</div>
+				<div id="ats-chat-widget-update-required" class="ats-chat-update-required" style="display:none;"></div>
 
 				<div id="ats-chat-cookie-notice" class="ats-chat-cookie-notice" style="display:none;"></div>
 				<div id="ats-chat-messages" class="ats-chat-messages"></div>

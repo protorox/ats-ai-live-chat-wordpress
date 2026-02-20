@@ -20,7 +20,8 @@
     messagesTimer: null,
     typingTimer: null,
     productSearchTimer: null,
-    draft: ''
+    draft: '',
+    updateReloadScheduled: false
   };
 
   var els = {};
@@ -89,6 +90,102 @@
     }
 
     els.errorBar.textContent = 'ATS Live Chat error: ' + message;
+  }
+
+  function getSession(key) {
+    try {
+      return window.sessionStorage.getItem(key) || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function setSession(key, value) {
+    try {
+      window.sessionStorage.setItem(key, value);
+    } catch (e) {
+      // Ignore storage errors.
+    }
+  }
+
+  function removeSession(key) {
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch (e) {
+      // Ignore storage errors.
+    }
+  }
+
+  function showUpdateRequired(message) {
+    if (!els.updateRequired) {
+      return;
+    }
+
+    els.updateRequired.textContent = message || '';
+    els.updateRequired.style.display = 'block';
+  }
+
+  function hideUpdateRequired() {
+    if (!els.updateRequired) {
+      return;
+    }
+
+    els.updateRequired.textContent = '';
+    els.updateRequired.style.display = 'none';
+  }
+
+  function forceReloadForBuild(buildVersion) {
+    if (!buildVersion || state.updateReloadScheduled) {
+      return;
+    }
+
+    state.updateReloadScheduled = true;
+    setTimeout(function () {
+      var nextUrl = window.location.href;
+
+      try {
+        var parsed = new URL(window.location.href);
+        parsed.searchParams.set('ats_chat_build', buildVersion);
+        parsed.searchParams.set('ats_chat_r', String(Date.now()));
+        nextUrl = parsed.toString();
+      } catch (e) {
+        nextUrl = window.location.href + (window.location.href.indexOf('?') === -1 ? '?' : '&') +
+          'ats_chat_build=' + encodeURIComponent(buildVersion) + '&ats_chat_r=' + Date.now();
+      }
+
+      window.location.replace(nextUrl);
+    }, 1200);
+  }
+
+  function checkBuildVersion(serverVersion) {
+    var serverBuild = (serverVersion || '').trim();
+    var clientBuild = (config.pluginVersion || '').trim();
+    var sessionKey = 'ats_chat_admin_forced_build';
+
+    if (!serverBuild || !clientBuild) {
+      return false;
+    }
+
+    if (serverBuild === clientBuild) {
+      if (getSession(sessionKey) === serverBuild) {
+        removeSession(sessionKey);
+      }
+      hideUpdateRequired();
+      state.updateReloadScheduled = false;
+      return false;
+    }
+
+    if (getSession(sessionKey) === serverBuild) {
+      showUpdateRequired((config.strings.updateRequiredManual || 'Update required. Clear cache and refresh.') +
+        ' (server: ' + serverBuild + ', loaded: ' + clientBuild + ')');
+      return true;
+    }
+
+    showUpdateRequired((config.strings.updateRequired || 'Update required. New build detected. Refreshing…') +
+      ' (server: ' + serverBuild + ', loaded: ' + clientBuild + ')');
+    setSession(sessionKey, serverBuild);
+    forceReloadForBuild(serverBuild);
+    return true;
   }
 
   function formatAgo(seconds) {
@@ -341,6 +438,9 @@
 
     api('/messages?conversation_id=' + encodeURIComponent(state.selectedConversationId) + '&since=' + encodeURIComponent(since), 'GET')
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         appendMessages(res.messages || [], !!initial);
         updateTyping(res.typing || null);
       })
@@ -358,6 +458,9 @@
 
     api('/conversation?visitor_id=' + encodeURIComponent(state.selectedVisitorId) + '&conversation_id=' + encodeURIComponent(state.selectedConversationId), 'GET')
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         if (!res || !res.conversation || !res.visitor) {
           return;
         }
@@ -382,6 +485,9 @@
 
     api('/visitors?since=' + encodeURIComponent(since), 'GET')
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         var incoming = Array.isArray(res.visitors) ? res.visitors : [];
         var now = Math.floor(Date.now() / 1000);
 
@@ -454,6 +560,9 @@
       message: text
     })
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         if (res.message) {
           appendMessages([res.message], false);
         }
@@ -540,6 +649,9 @@
           message_type: 'product_card',
           product_id: product.product_id || product.id
         }).then(function (res) {
+          if (checkBuildVersion(res.plugin_version || '')) {
+            return;
+          }
           if (res.message) {
             appendMessages([res.message], false);
           }
@@ -564,6 +676,9 @@
 
     api('/products/search?q=' + encodeURIComponent(query), 'GET')
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         renderProductResults(Array.isArray(res.results) ? res.results : []);
       })
       .catch(function (err) {
@@ -582,6 +697,9 @@
       send: false
     })
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         state.draft = (res.draft || '').trim();
         if (!state.draft) {
           alert('AI did not return a draft.');
@@ -662,6 +780,7 @@
     els.modalClose = $('ats-chat-modal-close');
     els.productSearch = $('ats-chat-product-search');
     els.productResults = $('ats-chat-product-results');
+    els.updateRequired = $('ats-chat-admin-update-required');
   }
 
   function startPolling() {

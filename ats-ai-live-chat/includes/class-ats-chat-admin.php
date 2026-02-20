@@ -126,6 +126,7 @@ class ATS_Chat_Admin {
 				array(
 					'restBase'       => esc_url_raw( rest_url( 'ats-chat/v1' ) ),
 					'nonce'          => wp_create_nonce( 'wp_rest' ),
+					'pluginVersion'  => ATS_CHAT_VERSION,
 					'wooEnabled'     => class_exists( 'WooCommerce' ),
 					'aiMode'         => ATS_Chat_DB::get_settings()['ai_mode'],
 					'strings'        => array(
@@ -137,6 +138,8 @@ class ATS_Chat_Admin {
 						'typingAgent'           => __( 'Agent is typing...', 'ats-ai-live-chat' ),
 						'searchProducts'        => __( 'Search products by title or SKU', 'ats-ai-live-chat' ),
 						'useDraft'              => __( 'Use draft', 'ats-ai-live-chat' ),
+						'updateRequired'        => __( 'Update required. New build detected. Refreshing…', 'ats-ai-live-chat' ),
+						'updateRequiredManual'  => __( 'Update required. Clear site/admin cache or CDN cache, then refresh this page.', 'ats-ai-live-chat' ),
 					),
 				)
 			);
@@ -161,6 +164,7 @@ class ATS_Chat_Admin {
 				<span><?php esc_html_e( 'Live Chat', 'ats-ai-live-chat' ); ?></span>
 				<span class="ats-chat-build-tag"><?php echo esc_html( $build_label ); ?></span>
 			</h1>
+			<div id="ats-chat-admin-update-required" class="ats-chat-update-required" style="display:none;"></div>
 			<div id="ats-chat-admin-app" class="ats-chat-admin-app">
 				<div class="ats-chat-left">
 					<div class="ats-chat-left-header">

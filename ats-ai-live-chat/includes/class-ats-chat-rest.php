@@ -250,6 +250,7 @@ class ATS_Chat_REST {
 			'agents_online'   => $agents_online,
 			'ai_mode'         => sanitize_key( $settings['ai_mode'] ),
 			'server_ts'       => time(),
+			'plugin_version'  => ATS_CHAT_VERSION,
 		);
 
 		if ( $ai_message ) {
@@ -319,6 +320,7 @@ class ATS_Chat_REST {
 				'success'         => true,
 				'visitor_id'      => $visitor_id,
 				'conversation_id' => $conversation['conversation_id'],
+				'plugin_version'  => ATS_CHAT_VERSION,
 			)
 		);
 	}
@@ -376,9 +378,10 @@ class ATS_Chat_REST {
 
 		return rest_ensure_response(
 			array(
-				'success' => true,
-				'actor'   => $actor,
-				'ts'      => time(),
+				'success'        => true,
+				'actor'          => $actor,
+				'ts'             => time(),
+				'plugin_version' => ATS_CHAT_VERSION,
 			)
 		);
 	}
@@ -516,6 +519,7 @@ class ATS_Chat_REST {
 					'referrer'      => isset( $visitor['referrer'] ) ? $visitor['referrer'] : '',
 				),
 				'server_ts'    => time(),
+				'plugin_version' => ATS_CHAT_VERSION,
 			)
 		);
 	}
@@ -568,6 +572,7 @@ class ATS_Chat_REST {
 				'typing'        => $typing,
 				'agents_online' => ATS_Chat_DB::has_online_agents(),
 				'server_ts'     => time(),
+				'plugin_version' => ATS_CHAT_VERSION,
 			)
 		);
 	}
@@ -623,8 +628,9 @@ class ATS_Chat_REST {
 
 		return rest_ensure_response(
 			array(
-				'message'   => $this->format_message( $message ),
-				'server_ts' => time(),
+				'message'        => $this->format_message( $message ),
+				'server_ts'      => time(),
+				'plugin_version' => ATS_CHAT_VERSION,
 			)
 		);
 	}
@@ -647,8 +653,9 @@ class ATS_Chat_REST {
 
 		return rest_ensure_response(
 			array(
-				'results'   => $results,
-				'server_ts' => time(),
+				'results'        => $results,
+				'server_ts'      => time(),
+				'plugin_version' => ATS_CHAT_VERSION,
 			)
 		);
 	}
@@ -694,19 +701,21 @@ class ATS_Chat_REST {
 
 			return rest_ensure_response(
 				array(
-					'sent'      => true,
-					'message'   => $this->format_message( $message ),
-					'draft'     => $reply,
-					'server_ts' => time(),
+					'sent'           => true,
+					'message'        => $this->format_message( $message ),
+					'draft'          => $reply,
+					'server_ts'      => time(),
+					'plugin_version' => ATS_CHAT_VERSION,
 				)
 			);
 		}
 
 		return rest_ensure_response(
 			array(
-				'sent'      => false,
-				'draft'     => $reply,
-				'server_ts' => time(),
+				'sent'           => false,
+				'draft'          => $reply,
+				'server_ts'      => time(),
+				'plugin_version' => ATS_CHAT_VERSION,
 			)
 		);
 	}

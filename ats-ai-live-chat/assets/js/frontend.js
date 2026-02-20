@@ -17,7 +17,8 @@
     typingTimer: null,
     typingCooldownTimer: null,
     agentsOnline: false,
-    aiMode: 'off'
+    aiMode: 'off',
+    updateReloadScheduled: false
   };
 
   var els = {};
@@ -37,6 +38,30 @@
   function setStorage(key, value) {
     try {
       localStorage.setItem(key, value);
+    } catch (e) {
+      // Ignore storage errors.
+    }
+  }
+
+  function getSession(key) {
+    try {
+      return window.sessionStorage.getItem(key) || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function setSession(key, value) {
+    try {
+      window.sessionStorage.setItem(key, value);
+    } catch (e) {
+      // Ignore storage errors.
+    }
+  }
+
+  function removeSession(key) {
+    try {
+      window.sessionStorage.removeItem(key);
     } catch (e) {
       // Ignore storage errors.
     }
@@ -251,6 +276,78 @@
     appendMessage(notice);
   }
 
+  function showUpdateRequired(message) {
+    if (!els.updateRequired) {
+      return;
+    }
+
+    els.updateRequired.textContent = message || '';
+    els.updateRequired.style.display = 'block';
+  }
+
+  function hideUpdateRequired() {
+    if (!els.updateRequired) {
+      return;
+    }
+
+    els.updateRequired.textContent = '';
+    els.updateRequired.style.display = 'none';
+  }
+
+  function forceReloadForBuild(buildVersion) {
+    if (!buildVersion || state.updateReloadScheduled) {
+      return;
+    }
+
+    state.updateReloadScheduled = true;
+    setTimeout(function () {
+      var nextUrl = window.location.href;
+
+      try {
+        var parsed = new URL(window.location.href);
+        parsed.searchParams.set('ats_chat_build', buildVersion);
+        parsed.searchParams.set('ats_chat_r', String(Date.now()));
+        nextUrl = parsed.toString();
+      } catch (e) {
+        nextUrl = window.location.href + (window.location.href.indexOf('?') === -1 ? '?' : '&') +
+          'ats_chat_build=' + encodeURIComponent(buildVersion) + '&ats_chat_r=' + Date.now();
+      }
+
+      window.location.replace(nextUrl);
+    }, 1200);
+  }
+
+  function checkBuildVersion(serverVersion) {
+    var serverBuild = (serverVersion || '').trim();
+    var clientBuild = (config.pluginVersion || '').trim();
+    var sessionKey = 'ats_chat_widget_forced_build';
+
+    if (!serverBuild || !clientBuild) {
+      return false;
+    }
+
+    if (serverBuild === clientBuild) {
+      if (getSession(sessionKey) === serverBuild) {
+        removeSession(sessionKey);
+      }
+      hideUpdateRequired();
+      state.updateReloadScheduled = false;
+      return false;
+    }
+
+    if (getSession(sessionKey) === serverBuild) {
+      showUpdateRequired((config.strings.updateRequiredManual || 'Update required. Clear cache and refresh.') +
+        ' (server: ' + serverBuild + ', loaded: ' + clientBuild + ')');
+      return true;
+    }
+
+    showUpdateRequired((config.strings.updateRequired || 'Update required. New chat build detected. Refreshing…') +
+      ' (server: ' + serverBuild + ', loaded: ' + clientBuild + ')');
+    setSession(sessionKey, serverBuild);
+    forceReloadForBuild(serverBuild);
+    return true;
+  }
+
   function sendPresence() {
     return api('/presence', 'POST', {
       nonce: config.nonce,
@@ -263,6 +360,9 @@
       email: getStorage('ats_chat_email') || config.visitorEmail || ''
     })
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         if (res.visitor_id) {
           state.visitorId = res.visitor_id;
           setStorage('ats_chat_visitor_id', res.visitor_id);
@@ -306,6 +406,9 @@
 
     api(query, 'GET')
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         var messages = Array.isArray(res.messages) ? res.messages : [];
         if (initialLoad && messages.length) {
           els.messages.innerHTML = '';
@@ -342,6 +445,9 @@
       user_agent: navigator.userAgent
     })
       .then(function (res) {
+        if (checkBuildVersion(res.plugin_version || '')) {
+          return;
+        }
         if (res.message) {
           appendMessage(res.message);
         }
@@ -394,7 +500,10 @@
       current_url: window.location.href,
       current_title: document.title
     })
-      .then(function () {
+      .then(function (res) {
+        if (checkBuildVersion((res && res.plugin_version) || '')) {
+          return;
+        }
         setStorage('ats_chat_name', name);
         setStorage('ats_chat_email', email);
         els.leadMessage.value = '';
@@ -506,6 +615,7 @@
     els.leadMessage = $('ats-chat-lead-message');
     els.leadSend = $('ats-chat-lead-send');
     els.cookieNotice = $('ats-chat-cookie-notice');
+    els.updateRequired = $('ats-chat-widget-update-required');
   }
 
   function init() {
