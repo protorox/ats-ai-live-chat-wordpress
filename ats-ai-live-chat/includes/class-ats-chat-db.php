@@ -59,6 +59,27 @@ class ATS_Chat_DB {
 	}
 
 	/**
+	 * Safely trim a string to DB column length.
+	 *
+	 * @param string $value Raw value.
+	 * @param int    $max_len Max length.
+	 * @return string
+	 */
+	public static function limit_text( $value, $max_len ) {
+		$value   = (string) $value;
+		$max_len = absint( $max_len );
+		if ( $max_len <= 0 ) {
+			return '';
+		}
+
+		if ( function_exists( 'mb_substr' ) ) {
+			return mb_substr( $value, 0, $max_len );
+		}
+
+		return substr( $value, 0, $max_len );
+	}
+
+	/**
 	 * Visitors table name.
 	 *
 	 * @return string
@@ -309,11 +330,11 @@ class ATS_Chat_DB {
 		$timestamp  = self::now_mysql();
 		$visitor_id = self::sanitize_visitor_id( isset( $data['visitor_id'] ) ? (string) $data['visitor_id'] : '' );
 		$current_url = isset( $data['current_url'] ) ? esc_url_raw( (string) $data['current_url'] ) : '';
-		$current_title = isset( $data['current_title'] ) ? sanitize_text_field( (string) $data['current_title'] ) : '';
+		$current_title = isset( $data['current_title'] ) ? self::limit_text( sanitize_text_field( (string) $data['current_title'] ), 255 ) : '';
 		$user_agent = isset( $data['user_agent'] ) ? sanitize_textarea_field( (string) $data['user_agent'] ) : '';
 		$referrer   = isset( $data['referrer'] ) ? esc_url_raw( (string) $data['referrer'] ) : '';
-		$name       = isset( $data['name'] ) ? sanitize_text_field( (string) $data['name'] ) : '';
-		$email      = isset( $data['email'] ) ? sanitize_email( (string) $data['email'] ) : '';
+		$name       = isset( $data['name'] ) ? self::limit_text( sanitize_text_field( (string) $data['name'] ), 191 ) : '';
+		$email      = isset( $data['email'] ) ? self::limit_text( sanitize_email( (string) $data['email'] ), 191 ) : '';
 
 		$existing = $wpdb->get_row(
 			$wpdb->prepare(
@@ -367,20 +388,36 @@ class ATS_Chat_DB {
 		}
 
 		if ( $existing ) {
-			$wpdb->update(
+			$updated = $wpdb->update(
 				$visitors,
 				$payload,
 				array( 'visitor_id' => $visitor_id ),
 				$formats,
 				array( '%s' )
 			);
+			if ( false === $updated && ! empty( $wpdb->last_error ) ) {
+				error_log( 'ATS Chat visitor update failed: ' . $wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 		} else {
 			$payload['visitor_id'] = $visitor_id;
 			$payload['created_at'] = $timestamp;
 			$insert_formats        = $formats;
 			$insert_formats[]      = '%s';
 			$insert_formats[]      = '%s';
-			$wpdb->insert( $visitors, $payload, $insert_formats );
+			$inserted = $wpdb->insert( $visitors, $payload, $insert_formats );
+			if ( false === $inserted ) {
+				// Retry as update in case a concurrent insert won a race.
+				$wpdb->update(
+					$visitors,
+					$payload,
+					array( 'visitor_id' => $visitor_id ),
+					$insert_formats,
+					array( '%s' )
+				);
+				if ( ! empty( $wpdb->last_error ) ) {
+					error_log( 'ATS Chat visitor insert failed: ' . $wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
+			}
 		}
 
 		$visitor = self::get_visitor( $visitor_id );
@@ -479,8 +516,8 @@ class ATS_Chat_DB {
 		$wpdb->update(
 			self::visitors_table(),
 			array(
-				'name'  => sanitize_text_field( $name ),
-				'email' => sanitize_email( $email ),
+				'name'  => self::limit_text( sanitize_text_field( $name ), 191 ),
+				'email' => self::limit_text( sanitize_email( $email ), 191 ),
 			),
 			array( 'visitor_id' => self::sanitize_visitor_id( $visitor_id ) ),
 			array( '%s', '%s' ),
@@ -528,7 +565,7 @@ class ATS_Chat_DB {
 		$conversation_id = wp_generate_uuid4();
 		$now             = self::now_mysql();
 
-		$wpdb->insert(
+		$inserted = $wpdb->insert(
 			self::conversations_table(),
 			array(
 				'conversation_id'         => $conversation_id,
@@ -540,6 +577,16 @@ class ATS_Chat_DB {
 			),
 			array( '%s', '%s', '%s', '%d', '%s', '%s' )
 		);
+		if ( false === $inserted && ! empty( $wpdb->last_error ) ) {
+			error_log( 'ATS Chat conversation insert failed: ' . $wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		if ( false === $inserted ) {
+			$existing_after_race = self::get_conversation_by_visitor( $visitor_id );
+			if ( $existing_after_race ) {
+				return $existing_after_race;
+			}
+		}
 
 		$conversation = self::get_conversation( $conversation_id );
 		if ( ! $conversation ) {
@@ -628,7 +675,7 @@ class ATS_Chat_DB {
 		$content_text    = sanitize_textarea_field( $content_text );
 		$content_json    = is_array( $content_json ) ? $content_json : array();
 
-		$wpdb->insert(
+		$inserted = $wpdb->insert(
 			self::messages_table(),
 			array(
 				'message_id'       => $message_id,
@@ -641,6 +688,9 @@ class ATS_Chat_DB {
 			),
 			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
+		if ( false === $inserted && ! empty( $wpdb->last_error ) ) {
+			error_log( 'ATS Chat message insert failed: ' . $wpdb->last_error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
 
 		$wpdb->update(
 			self::conversations_table(),
@@ -1007,5 +1057,35 @@ class ATS_Chat_DB {
 			return array();
 		}
 		return array_values( $decoded );
+	}
+
+	/**
+	 * Lightweight diagnostics for admin troubleshooting.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public static function diagnostics() {
+		global $wpdb;
+
+		self::ensure_schema();
+
+		$visitors_table      = self::visitors_table();
+		$conversations_table = self::conversations_table();
+		$messages_table      = self::messages_table();
+
+		$visitors_total      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$visitors_table}" );
+		$conversations_total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$conversations_table}" );
+		$messages_total      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$messages_table}" );
+
+		$latest_seen = (string) $wpdb->get_var( "SELECT MAX(last_seen) FROM {$visitors_table}" );
+
+		return array(
+			'tables_ready'        => self::are_tables_ready(),
+			'visitors_total'      => $visitors_total,
+			'conversations_total' => $conversations_total,
+			'messages_total'      => $messages_total,
+			'latest_last_seen'    => $latest_seen,
+			'site_now'            => self::now_mysql(),
+		);
 	}
 }

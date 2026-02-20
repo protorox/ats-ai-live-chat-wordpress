@@ -180,6 +180,7 @@ class ATS_Chat_REST {
 		$conversation = ATS_Chat_DB::get_or_create_conversation( $visitor['visitor_id'] );
 		$settings     = ATS_Chat_DB::get_settings();
 		$agents_online = ATS_Chat_DB::has_online_agents();
+		$diag         = ATS_Chat_DB::diagnostics();
 
 		return rest_ensure_response(
 			array(
@@ -192,6 +193,7 @@ class ATS_Chat_REST {
 				'cookie_notice_text'     => sanitize_text_field( (string) $settings['cookie_notice_text'] ),
 				'server_ts'              => time(),
 				'plugin_version'         => ATS_CHAT_VERSION,
+				'tables_ready'           => ! empty( $diag['tables_ready'] ),
 			)
 		);
 	}
@@ -430,6 +432,7 @@ class ATS_Chat_REST {
 				'online_agents'     => count( ATS_Chat_DB::get_online_agents() ),
 				'server_ts'         => time(),
 				'plugin_version'    => ATS_CHAT_VERSION,
+				'diagnostics'       => ATS_Chat_DB::diagnostics(),
 			)
 		);
 	}
