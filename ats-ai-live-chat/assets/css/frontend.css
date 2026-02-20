@@ -60,6 +60,12 @@
   color: #64748b;
 }
 
+.ats-chat-build-tag {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748b;
+}
+
 .ats-chat-close {
   border: 0;
   background: transparent;

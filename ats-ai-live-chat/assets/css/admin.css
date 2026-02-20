@@ -6,6 +6,24 @@
   min-height: 72vh;
 }
 
+.ats-chat-page-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ats-chat-build-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #eef2ff;
+  border: 1px solid #d8e0ff;
+  color: #1d2d5a;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+}
+
 .ats-chat-left,
 .ats-chat-right {
   background: #fff;

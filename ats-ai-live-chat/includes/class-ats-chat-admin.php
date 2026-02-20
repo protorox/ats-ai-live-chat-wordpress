@@ -152,9 +152,15 @@ class ATS_Chat_Admin {
 		if ( ! ATS_Chat_Plugin::user_can_agent() ) {
 			wp_die( esc_html__( 'You do not have access to this page.', 'ats-ai-live-chat' ) );
 		}
+
+		/* translators: %s: plugin build number. */
+		$build_label = sprintf( __( 'Build %s', 'ats-ai-live-chat' ), ATS_CHAT_VERSION );
 		?>
 		<div class="wrap ats-chat-admin-wrap">
-			<h1><?php esc_html_e( 'Live Chat', 'ats-ai-live-chat' ); ?></h1>
+			<h1 class="ats-chat-page-title">
+				<span><?php esc_html_e( 'Live Chat', 'ats-ai-live-chat' ); ?></span>
+				<span class="ats-chat-build-tag"><?php echo esc_html( $build_label ); ?></span>
+			</h1>
 			<div id="ats-chat-admin-app" class="ats-chat-admin-app">
 				<div class="ats-chat-left">
 					<div class="ats-chat-left-header">

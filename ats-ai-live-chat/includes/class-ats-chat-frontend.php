@@ -86,6 +86,9 @@ class ATS_Chat_Frontend {
 		if ( is_admin() ) {
 			return;
 		}
+
+		/* translators: %s: plugin build number. */
+		$build_label = sprintf( __( 'Build %s', 'ats-ai-live-chat' ), ATS_CHAT_VERSION );
 		?>
 		<div id="ats-chat-widget" class="ats-chat-widget" aria-live="polite">
 			<button id="ats-chat-toggle" class="ats-chat-toggle" aria-expanded="false" aria-controls="ats-chat-panel">
@@ -96,6 +99,7 @@ class ATS_Chat_Frontend {
 					<div>
 						<strong><?php esc_html_e( 'Live Chat', 'ats-ai-live-chat' ); ?></strong>
 						<div class="ats-chat-panel-subtitle"><?php esc_html_e( 'Ask us anything', 'ats-ai-live-chat' ); ?></div>
+						<div class="ats-chat-build-tag"><?php echo esc_html( $build_label ); ?></div>
 					</div>
 					<button type="button" id="ats-chat-close" class="ats-chat-close" aria-label="<?php esc_attr_e( 'Close chat', 'ats-ai-live-chat' ); ?>">×</button>
 				</div>
