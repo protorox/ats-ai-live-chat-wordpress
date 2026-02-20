@@ -10,6 +10,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class ATS_Chat_DB {
 
 	/**
+	 * Tracks whether schema check has run for this request.
+	 *
+	 * @var bool
+	 */
+	private static $schema_checked = false;
+
+	/**
 	 * Current local MySQL datetime string in site timezone.
 	 *
 	 * @return string
@@ -59,6 +66,48 @@ class ATS_Chat_DB {
 	public static function visitors_table() {
 		global $wpdb;
 		return $wpdb->prefix . 'ats_chat_visitors';
+	}
+
+	/**
+	 * Check if required tables exist.
+	 *
+	 * @return bool
+	 */
+	public static function are_tables_ready() {
+		global $wpdb;
+
+		$tables = array(
+			self::visitors_table(),
+			self::conversations_table(),
+			self::messages_table(),
+			self::events_table(),
+			self::leads_table(),
+		);
+
+		foreach ( $tables as $table ) {
+			$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+			if ( $found !== $table ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Ensure schema exists even if activation hook was skipped on deploy.
+	 *
+	 * @return void
+	 */
+	public static function ensure_schema() {
+		if ( self::$schema_checked ) {
+			return;
+		}
+
+		self::$schema_checked = true;
+		if ( ! self::are_tables_ready() ) {
+			self::create_tables();
+		}
 	}
 
 	/**
@@ -254,6 +303,7 @@ class ATS_Chat_DB {
 	 */
 	public static function upsert_visitor_presence( $data ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$visitors   = self::visitors_table();
 		$timestamp  = self::now_mysql();
@@ -393,6 +443,7 @@ class ATS_Chat_DB {
 	 */
 	public static function get_visitor( $visitor_id ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$visitors = self::visitors_table();
 		$row      = $wpdb->get_row(
@@ -423,6 +474,7 @@ class ATS_Chat_DB {
 	 */
 	public static function save_visitor_profile( $visitor_id, $name, $email ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$wpdb->update(
 			self::visitors_table(),
@@ -445,6 +497,7 @@ class ATS_Chat_DB {
 	 */
 	public static function save_cart_context( $visitor_id, $cart_items ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$wpdb->update(
 			self::visitors_table(),
@@ -465,6 +518,7 @@ class ATS_Chat_DB {
 	 */
 	public static function get_or_create_conversation( $visitor_id ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$conversation = self::get_conversation_by_visitor( $visitor_id );
 		if ( $conversation ) {
@@ -509,6 +563,7 @@ class ATS_Chat_DB {
 	 */
 	public static function get_conversation_by_visitor( $visitor_id ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
@@ -529,6 +584,7 @@ class ATS_Chat_DB {
 	 */
 	public static function get_conversation( $conversation_id ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$conversation_id = self::sanitize_visitor_id( $conversation_id );
 		$row             = $wpdb->get_row(
@@ -554,6 +610,7 @@ class ATS_Chat_DB {
 	 */
 	public static function add_message( $conversation_id, $sender_type, $message_type, $content_text = '', $content_json = array() ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$allowed_sender_types = array( 'visitor', 'agent', 'ai', 'system' );
 		$allowed_message_types = array( 'text', 'product_card', 'system' );
@@ -628,6 +685,7 @@ class ATS_Chat_DB {
 	 */
 	public static function get_messages( $conversation_id, $since = 0 ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$conversation_id = self::sanitize_visitor_id( $conversation_id );
 		$query           = "SELECT * FROM " . self::messages_table() . " WHERE conversation_id = %s";
@@ -667,6 +725,7 @@ class ATS_Chat_DB {
 	 */
 	public static function add_event( $conversation_id, $visitor_id, $actor_type, $event_type, $payload = array() ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$conversation_id = self::sanitize_visitor_id( $conversation_id );
 		$visitor_id      = self::sanitize_visitor_id( $visitor_id );
@@ -704,6 +763,7 @@ class ATS_Chat_DB {
 	 */
 	public static function get_typing_state( $conversation_id, $viewer_type ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$target_actor = ( 'agent' === $viewer_type ) ? 'visitor' : 'agent';
 		$cutoff       = self::mysql_from_unix( time() - 6 );
@@ -745,6 +805,7 @@ class ATS_Chat_DB {
 	 */
 	public static function get_live_visitors( $since = 0 ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$active_cutoff = self::mysql_from_unix( time() - 120 );
 		$rows          = $wpdb->get_results(
@@ -788,6 +849,7 @@ class ATS_Chat_DB {
 	 */
 	public static function save_lead( $data ) {
 		global $wpdb;
+		self::ensure_schema();
 
 		$visitor_id = self::sanitize_visitor_id( isset( $data['visitor_id'] ) ? (string) $data['visitor_id'] : '' );
 		$name       = sanitize_text_field( isset( $data['name'] ) ? (string) $data['name'] : '' );

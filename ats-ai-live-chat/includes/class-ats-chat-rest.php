@@ -191,6 +191,7 @@ class ATS_Chat_REST {
 				'cookie_notice_enabled'  => ! empty( $settings['cookie_notice_enabled'] ),
 				'cookie_notice_text'     => sanitize_text_field( (string) $settings['cookie_notice_text'] ),
 				'server_ts'              => time(),
+				'plugin_version'         => ATS_CHAT_VERSION,
 			)
 		);
 	}
@@ -428,6 +429,7 @@ class ATS_Chat_REST {
 				'visitors'          => $data,
 				'online_agents'     => count( ATS_Chat_DB::get_online_agents() ),
 				'server_ts'         => time(),
+				'plugin_version'    => ATS_CHAT_VERSION,
 			)
 		);
 	}

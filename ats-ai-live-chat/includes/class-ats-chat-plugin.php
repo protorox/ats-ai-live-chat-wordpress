@@ -50,7 +50,10 @@ class ATS_Chat_Plugin {
 	 */
 	private function maybe_upgrade() {
 		$current_version = get_option( 'ats_chat_version', '' );
-		if ( version_compare( (string) $current_version, ATS_CHAT_VERSION, '<' ) ) {
+		$needs_update    = version_compare( (string) $current_version, ATS_CHAT_VERSION, '<' );
+		$missing_tables  = ! ATS_Chat_DB::are_tables_ready();
+
+		if ( $needs_update || $missing_tables ) {
 			ATS_Chat_DB::create_tables();
 			update_option( 'ats_chat_version', ATS_CHAT_VERSION, false );
 		}
