@@ -434,7 +434,7 @@
       return;
     }
 
-    var since = initial ? 0 : state.lastMessageTs;
+    var since = initial ? 0 : Math.max(0, (state.lastMessageTs || 0) - 1);
 
     api('/messages?conversation_id=' + encodeURIComponent(state.selectedConversationId) + '&since=' + encodeURIComponent(since), 'GET')
       .then(function (res) {

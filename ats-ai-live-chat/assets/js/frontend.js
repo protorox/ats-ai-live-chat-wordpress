@@ -271,7 +271,7 @@
       sender_type: 'system',
       message_type: 'text',
       content_text: text || 'Connection issue. Please try again.',
-      ts: Math.floor(Date.now() / 1000)
+      ts: 0
     };
     appendMessage(notice);
   }
@@ -399,10 +399,11 @@
       return;
     }
 
+    var since = initialLoad ? 0 : Math.max(0, (state.lastMessageTs || 0) - 1);
     var query = '/messages?conversation_id=' + encodeURIComponent(state.conversationId) +
       '&visitor_id=' + encodeURIComponent(state.visitorId) +
       '&nonce=' + encodeURIComponent(config.nonce) +
-      '&since=' + encodeURIComponent(initialLoad ? 0 : state.lastMessageTs);
+      '&since=' + encodeURIComponent(since);
 
     api(query, 'GET')
       .then(function (res) {
