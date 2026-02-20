@@ -421,17 +421,29 @@ class ATS_Chat_DB {
 		}
 
 		$visitor = self::get_visitor( $visitor_id );
-		if ( ! $visitor ) {
-			$visitor = array(
-				'visitor_id'        => $visitor_id,
-				'current_url'       => $current_url,
-				'current_title'     => $current_title,
-				'last_seen'         => $timestamp,
-				'page_history_json' => wp_json_encode( $page_history ),
-			);
+		if ( $visitor ) {
+			return $visitor;
 		}
 
-		return $visitor;
+		// Last-resort fallback storage for hosts where custom-table writes fail.
+		$fallback_visitor = array(
+			'visitor_id'        => $visitor_id,
+			'name'              => $name,
+			'email'             => $email,
+			'created_at'        => $timestamp,
+			'last_seen'         => $timestamp,
+			'current_url'       => $current_url,
+			'current_title'     => $current_title,
+			'page_history_json' => wp_json_encode( $page_history ),
+			'cart_json'         => '[]',
+			'user_agent'        => $user_agent,
+			'referrer'          => $referrer,
+			'page_history'      => $page_history,
+			'cart'              => array(),
+		);
+		self::fallback_set_visitor( $fallback_visitor );
+
+		return $fallback_visitor;
 	}
 
 	/**
@@ -492,7 +504,7 @@ class ATS_Chat_DB {
 		);
 
 		if ( ! $row ) {
-			return null;
+			return self::fallback_get_visitor( $visitor_id );
 		}
 
 		$row['page_history'] = self::decode_json_array( $row['page_history_json'] );
@@ -523,6 +535,13 @@ class ATS_Chat_DB {
 			array( '%s', '%s' ),
 			array( '%s' )
 		);
+
+		$fallback = self::fallback_get_visitor( $visitor_id );
+		if ( $fallback ) {
+			$fallback['name']  = self::limit_text( sanitize_text_field( $name ), 191 );
+			$fallback['email'] = self::limit_text( sanitize_email( $email ), 191 );
+			self::fallback_set_visitor( $fallback );
+		}
 	}
 
 	/**
@@ -536,15 +555,23 @@ class ATS_Chat_DB {
 		global $wpdb;
 		self::ensure_schema();
 
+		$cart_json = wp_json_encode( is_array( $cart_items ) ? $cart_items : array() );
+
 		$wpdb->update(
 			self::visitors_table(),
 			array(
-				'cart_json' => wp_json_encode( is_array( $cart_items ) ? $cart_items : array() ),
+				'cart_json' => $cart_json,
 			),
 			array( 'visitor_id' => self::sanitize_visitor_id( $visitor_id ) ),
 			array( '%s' ),
 			array( '%s' )
 		);
+
+		$fallback = self::fallback_get_visitor( $visitor_id );
+		if ( $fallback ) {
+			$fallback['cart_json'] = $cart_json;
+			self::fallback_set_visitor( $fallback );
+		}
 	}
 
 	/**
@@ -586,20 +613,16 @@ class ATS_Chat_DB {
 			if ( $existing_after_race ) {
 				return $existing_after_race;
 			}
+
+			return self::fallback_get_or_create_conversation( $visitor_id );
 		}
 
 		$conversation = self::get_conversation( $conversation_id );
-		if ( ! $conversation ) {
-			$conversation = array(
-				'conversation_id' => $conversation_id,
-				'visitor_id'      => self::sanitize_visitor_id( $visitor_id ),
-				'status'          => 'open',
-				'created_at'      => $now,
-				'updated_at'      => $now,
-			);
+		if ( $conversation ) {
+			return $conversation;
 		}
 
-		return $conversation;
+		return self::fallback_get_or_create_conversation( $visitor_id, $conversation_id, $now );
 	}
 
 	/**
@@ -620,7 +643,11 @@ class ATS_Chat_DB {
 			ARRAY_A
 		);
 
-		return $row ? $row : null;
+		if ( $row ) {
+			return $row;
+		}
+
+		return self::fallback_get_conversation_by_visitor( $visitor_id );
 	}
 
 	/**
@@ -642,7 +669,11 @@ class ATS_Chat_DB {
 			ARRAY_A
 		);
 
-		return $row ? $row : null;
+		if ( $row ) {
+			return $row;
+		}
+
+		return self::fallback_get_conversation( $conversation_id );
 	}
 
 	/**
@@ -708,22 +739,21 @@ class ATS_Chat_DB {
 			ARRAY_A
 		);
 
-		if ( ! $row ) {
-			$row = array(
-				'message_id'      => $message_id,
-				'conversation_id' => $conversation_id,
-				'sender_type'     => $sender_type,
-				'message_type'    => $message_type,
-				'content_text'    => $content_text,
-				'content_json'    => wp_json_encode( $content_json ),
-				'created_at'      => $now,
-			);
+		if ( $row ) {
+			$row['content'] = self::decode_json_object( isset( $row['content_json'] ) ? $row['content_json'] : '{}' );
+			$row['ts']      = self::unix_from_mysql( $row['created_at'] );
+			return $row;
 		}
 
-		$row['content'] = self::decode_json_object( isset( $row['content_json'] ) ? $row['content_json'] : '{}' );
-		$row['ts']      = self::unix_from_mysql( $row['created_at'] );
-
-		return $row;
+		return self::fallback_add_message(
+			$conversation_id,
+			$sender_type,
+			$message_type,
+			$content_text,
+			$content_json,
+			$message_id,
+			$now
+		);
 	}
 
 	/**
@@ -752,7 +782,7 @@ class ATS_Chat_DB {
 		$prepared = $wpdb->prepare( $query, $params );
 		$rows     = $wpdb->get_results( $prepared, ARRAY_A );
 		if ( ! is_array( $rows ) ) {
-			return array();
+			$rows = array();
 		}
 
 		foreach ( $rows as &$row ) {
@@ -760,7 +790,35 @@ class ATS_Chat_DB {
 			$row['ts']      = self::unix_from_mysql( $row['created_at'] );
 		}
 
-		return $rows;
+		$fallback_rows = self::fallback_get_messages( $conversation_id, $since );
+		if ( empty( $fallback_rows ) ) {
+			return $rows;
+		}
+
+		$seen = array();
+		foreach ( $rows as $row ) {
+			if ( ! empty( $row['message_id'] ) ) {
+				$seen[ $row['message_id'] ] = true;
+			}
+		}
+
+		foreach ( $fallback_rows as $row ) {
+			if ( ! empty( $row['message_id'] ) && isset( $seen[ $row['message_id'] ] ) ) {
+				continue;
+			}
+			$rows[] = $row;
+		}
+
+		usort(
+			$rows,
+			static function ( $a, $b ) {
+				$a_ts = isset( $a['ts'] ) ? absint( $a['ts'] ) : 0;
+				$b_ts = isset( $b['ts'] ) ? absint( $b['ts'] ) : 0;
+				return $a_ts <=> $b_ts;
+			}
+		);
+
+		return array_slice( $rows, -200 );
 	}
 
 	/**
@@ -888,7 +946,35 @@ class ATS_Chat_DB {
 			$filtered[]          = $row;
 		}
 
-		return $filtered;
+		$fallback_rows = self::fallback_get_live_visitors( $since );
+		if ( empty( $fallback_rows ) ) {
+			return $filtered;
+		}
+
+		$map = array();
+		foreach ( $filtered as $row ) {
+			$map[ $row['visitor_id'] ] = $row;
+		}
+		foreach ( $fallback_rows as $row ) {
+			if ( empty( $row['visitor_id'] ) ) {
+				continue;
+			}
+			if ( ! isset( $map[ $row['visitor_id'] ] ) ) {
+				$map[ $row['visitor_id'] ] = $row;
+			}
+		}
+
+		$merged = array_values( $map );
+		usort(
+			$merged,
+			static function ( $a, $b ) {
+				$a_ts = isset( $a['last_seen_ts'] ) ? absint( $a['last_seen_ts'] ) : 0;
+				$b_ts = isset( $b['last_seen_ts'] ) ? absint( $b['last_seen_ts'] ) : 0;
+				return $b_ts <=> $a_ts;
+			}
+		);
+
+		return array_slice( $merged, 0, 250 );
 	}
 
 	/**
@@ -1060,6 +1146,305 @@ class ATS_Chat_DB {
 	}
 
 	/**
+	 * Get fallback state option.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private static function fallback_state() {
+		$state = get_option( 'ats_chat_fallback_state', array() );
+		if ( ! is_array( $state ) ) {
+			$state = array();
+		}
+
+		if ( empty( $state['visitors'] ) || ! is_array( $state['visitors'] ) ) {
+			$state['visitors'] = array();
+		}
+		if ( empty( $state['conversations'] ) || ! is_array( $state['conversations'] ) ) {
+			$state['conversations'] = array();
+		}
+		if ( empty( $state['messages'] ) || ! is_array( $state['messages'] ) ) {
+			$state['messages'] = array();
+		}
+
+		return $state;
+	}
+
+	/**
+	 * Persist fallback state option.
+	 *
+	 * @param array<string,mixed> $state State.
+	 * @return void
+	 */
+	private static function fallback_save_state( $state ) {
+		if ( ! is_array( $state ) ) {
+			return;
+		}
+		update_option( 'ats_chat_fallback_state', $state, false );
+	}
+
+	/**
+	 * Store visitor in fallback state.
+	 *
+	 * @param array<string,mixed> $visitor Visitor.
+	 * @return void
+	 */
+	private static function fallback_set_visitor( $visitor ) {
+		if ( empty( $visitor['visitor_id'] ) ) {
+			return;
+		}
+
+		$visitor_id = self::sanitize_visitor_id( (string) $visitor['visitor_id'] );
+		$state      = self::fallback_state();
+		$existing   = isset( $state['visitors'][ $visitor_id ] ) && is_array( $state['visitors'][ $visitor_id ] )
+			? $state['visitors'][ $visitor_id ]
+			: array();
+
+		$merged = array_merge( $existing, $visitor );
+		$merged['visitor_id'] = $visitor_id;
+
+		if ( empty( $merged['created_at'] ) ) {
+			$merged['created_at'] = self::now_mysql();
+		}
+		if ( empty( $merged['last_seen'] ) ) {
+			$merged['last_seen'] = self::now_mysql();
+		}
+		if ( empty( $merged['page_history_json'] ) ) {
+			$merged['page_history_json'] = '[]';
+		}
+		if ( empty( $merged['cart_json'] ) ) {
+			$merged['cart_json'] = '[]';
+		}
+
+		$state['visitors'][ $visitor_id ] = $merged;
+		self::fallback_save_state( $state );
+	}
+
+	/**
+	 * Get visitor from fallback state.
+	 *
+	 * @param string $visitor_id Visitor ID.
+	 * @return array<string,mixed>|null
+	 */
+	private static function fallback_get_visitor( $visitor_id ) {
+		$visitor_id = self::sanitize_visitor_id( $visitor_id );
+		$state      = self::fallback_state();
+
+		if ( empty( $state['visitors'][ $visitor_id ] ) || ! is_array( $state['visitors'][ $visitor_id ] ) ) {
+			return null;
+		}
+
+		$row                 = $state['visitors'][ $visitor_id ];
+		$row['page_history'] = self::decode_json_array( isset( $row['page_history_json'] ) ? (string) $row['page_history_json'] : '[]' );
+		$row['cart']         = self::decode_json_array( isset( $row['cart_json'] ) ? (string) $row['cart_json'] : '[]' );
+
+		return $row;
+	}
+
+	/**
+	 * Get live visitors from fallback state.
+	 *
+	 * @param int $since Unix timestamp.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function fallback_get_live_visitors( $since = 0 ) {
+		$state  = self::fallback_state();
+		$rows   = array();
+		$cutoff = time() - 120;
+
+		foreach ( $state['visitors'] as $visitor_id => $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$last_seen_ts = self::unix_from_mysql( isset( $row['last_seen'] ) ? (string) $row['last_seen'] : '' );
+			if ( $last_seen_ts < $cutoff ) {
+				continue;
+			}
+
+			$conversation = self::fallback_get_conversation_by_visitor( $visitor_id );
+			$updated_ts   = 0;
+			$updated_at   = '';
+			if ( $conversation ) {
+				$updated_at = isset( $conversation['updated_at'] ) ? (string) $conversation['updated_at'] : '';
+				$updated_ts = self::unix_from_mysql( $updated_at );
+			}
+
+			if ( $since > 0 && $last_seen_ts <= $since && $updated_ts <= $since ) {
+				continue;
+			}
+
+			$row['visitor_id']              = $visitor_id;
+			$row['conversation_id']         = $conversation ? (string) $conversation['conversation_id'] : '';
+			$row['conversation_updated_at'] = $updated_at;
+			$row['last_seen_ts']            = $last_seen_ts;
+			$row['page_history']            = self::decode_json_array( isset( $row['page_history_json'] ) ? (string) $row['page_history_json'] : '[]' );
+			$row['cart']                    = self::decode_json_array( isset( $row['cart_json'] ) ? (string) $row['cart_json'] : '[]' );
+
+			$rows[] = $row;
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Get or create fallback conversation.
+	 *
+	 * @param string      $visitor_id Visitor ID.
+	 * @param string      $conversation_id Optional forced ID.
+	 * @param string|null $now Optional datetime.
+	 * @return array<string,mixed>
+	 */
+	private static function fallback_get_or_create_conversation( $visitor_id, $conversation_id = '', $now = null ) {
+		$visitor_id    = self::sanitize_visitor_id( $visitor_id );
+		$existing      = self::fallback_get_conversation_by_visitor( $visitor_id );
+		if ( $existing ) {
+			return $existing;
+		}
+
+		$conversation_id = $conversation_id ? self::sanitize_visitor_id( $conversation_id ) : wp_generate_uuid4();
+		$now             = $now ? (string) $now : self::now_mysql();
+
+		$state = self::fallback_state();
+		$row   = array(
+			'conversation_id'        => $conversation_id,
+			'visitor_id'             => $visitor_id,
+			'status'                 => 'open',
+			'assigned_agent_user_id' => null,
+			'created_at'             => $now,
+			'updated_at'             => $now,
+		);
+
+		$state['conversations'][ $conversation_id ] = $row;
+		self::fallback_save_state( $state );
+
+		return $row;
+	}
+
+	/**
+	 * Get fallback conversation by visitor ID.
+	 *
+	 * @param string $visitor_id Visitor ID.
+	 * @return array<string,mixed>|null
+	 */
+	private static function fallback_get_conversation_by_visitor( $visitor_id ) {
+		$visitor_id = self::sanitize_visitor_id( $visitor_id );
+		$state      = self::fallback_state();
+
+		foreach ( $state['conversations'] as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			if ( isset( $row['visitor_id'], $row['status'] ) && $visitor_id === $row['visitor_id'] && 'open' === $row['status'] ) {
+				return $row;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get fallback conversation by conversation ID.
+	 *
+	 * @param string $conversation_id Conversation ID.
+	 * @return array<string,mixed>|null
+	 */
+	private static function fallback_get_conversation( $conversation_id ) {
+		$conversation_id = self::sanitize_visitor_id( $conversation_id );
+		$state           = self::fallback_state();
+
+		if ( empty( $state['conversations'][ $conversation_id ] ) || ! is_array( $state['conversations'][ $conversation_id ] ) ) {
+			return null;
+		}
+
+		return $state['conversations'][ $conversation_id ];
+	}
+
+	/**
+	 * Add fallback message.
+	 *
+	 * @param string              $conversation_id Conversation ID.
+	 * @param string              $sender_type Sender type.
+	 * @param string              $message_type Message type.
+	 * @param string              $content_text Message text.
+	 * @param array<string,mixed> $content_json Structured content.
+	 * @param string              $message_id Message ID.
+	 * @param string              $created_at Datetime.
+	 * @return array<string,mixed>
+	 */
+	private static function fallback_add_message( $conversation_id, $sender_type, $message_type, $content_text, $content_json, $message_id, $created_at ) {
+		$conversation_id = self::sanitize_visitor_id( $conversation_id );
+		$message_id      = self::sanitize_visitor_id( $message_id );
+		$created_at      = (string) $created_at;
+		$content_json    = is_array( $content_json ) ? $content_json : array();
+
+		$state = self::fallback_state();
+		if ( empty( $state['messages'][ $conversation_id ] ) || ! is_array( $state['messages'][ $conversation_id ] ) ) {
+			$state['messages'][ $conversation_id ] = array();
+		}
+
+		$row = array(
+			'message_id'      => $message_id,
+			'conversation_id' => $conversation_id,
+			'sender_type'     => $sender_type,
+			'message_type'    => $message_type,
+			'content_text'    => $content_text,
+			'content_json'    => wp_json_encode( $content_json ),
+			'content'         => $content_json,
+			'created_at'      => $created_at,
+			'ts'              => self::unix_from_mysql( $created_at ),
+		);
+
+		$state['messages'][ $conversation_id ][] = $row;
+
+		if ( ! empty( $state['conversations'][ $conversation_id ] ) && is_array( $state['conversations'][ $conversation_id ] ) ) {
+			$state['conversations'][ $conversation_id ]['updated_at'] = $created_at;
+		}
+
+		self::fallback_save_state( $state );
+		return $row;
+	}
+
+	/**
+	 * Get fallback messages.
+	 *
+	 * @param string $conversation_id Conversation ID.
+	 * @param int    $since Since unix timestamp.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function fallback_get_messages( $conversation_id, $since = 0 ) {
+		$conversation_id = self::sanitize_visitor_id( $conversation_id );
+		$state           = self::fallback_state();
+
+		if ( empty( $state['messages'][ $conversation_id ] ) || ! is_array( $state['messages'][ $conversation_id ] ) ) {
+			return array();
+		}
+
+		$rows = array();
+		foreach ( $state['messages'][ $conversation_id ] as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$ts = isset( $row['ts'] ) ? absint( $row['ts'] ) : self::unix_from_mysql( isset( $row['created_at'] ) ? (string) $row['created_at'] : '' );
+			if ( $since > 0 && $ts <= $since ) {
+				continue;
+			}
+			$row['ts']      = $ts;
+			$row['content'] = isset( $row['content'] ) && is_array( $row['content'] ) ? $row['content'] : self::decode_json_object( isset( $row['content_json'] ) ? (string) $row['content_json'] : '{}' );
+			$rows[]         = $row;
+		}
+
+		usort(
+			$rows,
+			static function ( $a, $b ) {
+				$a_ts = isset( $a['ts'] ) ? absint( $a['ts'] ) : 0;
+				$b_ts = isset( $b['ts'] ) ? absint( $b['ts'] ) : 0;
+				return $a_ts <=> $b_ts;
+			}
+		);
+
+		return array_slice( $rows, -200 );
+	}
+
+	/**
 	 * Lightweight diagnostics for admin troubleshooting.
 	 *
 	 * @return array<string,mixed>
@@ -1078,12 +1463,25 @@ class ATS_Chat_DB {
 		$messages_total      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$messages_table}" );
 
 		$latest_seen = (string) $wpdb->get_var( "SELECT MAX(last_seen) FROM {$visitors_table}" );
+		$fallback    = self::fallback_state();
+
+		$fallback_messages_total = 0;
+		if ( ! empty( $fallback['messages'] ) && is_array( $fallback['messages'] ) ) {
+			foreach ( $fallback['messages'] as $rows ) {
+				if ( is_array( $rows ) ) {
+					$fallback_messages_total += count( $rows );
+				}
+			}
+		}
 
 		return array(
 			'tables_ready'        => self::are_tables_ready(),
 			'visitors_total'      => $visitors_total,
 			'conversations_total' => $conversations_total,
 			'messages_total'      => $messages_total,
+			'fallback_visitors'   => is_array( $fallback['visitors'] ) ? count( $fallback['visitors'] ) : 0,
+			'fallback_conversations' => is_array( $fallback['conversations'] ) ? count( $fallback['conversations'] ) : 0,
+			'fallback_messages'   => $fallback_messages_total,
 			'latest_last_seen'    => $latest_seen,
 			'site_now'            => self::now_mysql(),
 		);
