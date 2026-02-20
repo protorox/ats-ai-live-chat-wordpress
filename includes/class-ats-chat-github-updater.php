@@ -3,7 +3,7 @@
  * GitHub release updater for ATS Chat.
  *
  * Uses GitHub Releases as the update source. Publish releases with an
- * attached zip asset containing the plugin folder `ats-ai-live-chat/`.
+ * attached zip asset containing the plugin folder.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

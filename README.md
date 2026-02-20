@@ -11,7 +11,7 @@ Self-hosted live chat plugin for WordPress 6.x with:
 
 ## Install
 
-1. Copy folder `ats-ai-live-chat` into `wp-content/plugins/`.
+1. Copy this plugin folder into `wp-content/plugins/ats-ai-live-chat-wordpress/` (plugin root contains `ats-ai-live-chat.php`).
 2. In WordPress admin, activate **ATS AI Live Chat**.
 3. Go to **Live Chat > Settings**:
    - Set AI mode (`Off`, `Auto`, or `Draft`).
@@ -58,9 +58,10 @@ Self-hosted live chat plugin for WordPress 6.x with:
 This plugin now supports auto-updates from GitHub Releases.
 
 1. Keep this repo connected to your WordPress site.
-2. Push changes to `main`. GitHub Actions auto-bumps patch version, tags, builds zip, and publishes a release.
-3. The plugin updater checks GitHub releases and auto-updates this plugin in WordPress.
-4. Optional override: set a different repo in `wp-config.php`:
+2. Set WordPress GitHub deployment destination to `/wp-content/plugins/ats-ai-live-chat-wordpress`.
+3. Push changes to `main`. GitHub Actions auto-bumps patch version, tags, builds zip, and publishes a release.
+4. The plugin updater checks GitHub releases and auto-updates this plugin in WordPress.
+5. Optional override: set a different repo in `wp-config.php`:
 
 ```php
 define( 'ATS_CHAT_GITHUB_REPO', 'YOUR_GITHUB_USERNAME/YOUR_REPO_NAME' );
@@ -68,5 +69,5 @@ define( 'ATS_CHAT_GITHUB_REPO', 'YOUR_GITHUB_USERNAME/YOUR_REPO_NAME' );
 define( 'ATS_CHAT_GITHUB_TOKEN', 'ghp_xxxxxxxxxxxxxxxxxxxx' );
 ```
 
-5. If your repo is private, set `ATS_CHAT_GITHUB_TOKEN`.
-6. Auto-updates still depend on WordPress cron/update checks. This plugin reduces GitHub cache to 1 minute for faster detection.
+6. If your repo is private, set `ATS_CHAT_GITHUB_TOKEN`.
+7. Auto-updates still depend on WordPress cron/update checks. This plugin reduces GitHub cache to 1 minute for faster detection.

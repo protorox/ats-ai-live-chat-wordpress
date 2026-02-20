@@ -18,11 +18,23 @@ jobs:
 
       - name: Build zip
         run: |
-          zip -r ats-ai-live-chat.zip ats-ai-live-chat -x "*.DS_Store" "*.git*"
+          rm -rf dist
+          mkdir -p dist/ats-ai-live-chat-wordpress
+          rsync -a \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '*.zip' \
+            --exclude '.DS_Store' \
+            ./ dist/ats-ai-live-chat-wordpress/
+          cd dist
+          zip -r ../ats-ai-live-chat-wordpress.zip ats-ai-live-chat-wordpress
+          cp ../ats-ai-live-chat-wordpress.zip ../ats-ai-live-chat.zip
 
       - name: Upload zip to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: ats-ai-live-chat.zip
+          files: |
+            ats-ai-live-chat-wordpress.zip
+            ats-ai-live-chat.zip
           overwrite_files: true
