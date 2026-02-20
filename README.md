@@ -1,4 +1,4 @@
-# ATS AI Live Chat (Version 1.1.9 working)
+# ATS AI Live Chat (Version 1.1.10 working)
 
 Self-hosted live chat plugin for WordPress 6.x with:
 
