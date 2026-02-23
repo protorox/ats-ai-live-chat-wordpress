@@ -295,9 +295,6 @@
   function setTyping(typing) {
     if (typing && typing.is_typing) {
       var text = config.strings.typingAgent || 'Agent is typing…';
-      if (typing.preview) {
-        text += ' ' + typing.preview;
-      }
       els.typing.textContent = text;
       els.typing.style.display = 'block';
       return;
