@@ -20,7 +20,8 @@
     aiMode: 'off',
     updateReloadScheduled: false,
     presenceFailures: 0,
-    lastPresenceErrorAt: 0
+    lastPresenceErrorAt: 0,
+    pollCount: 0
   };
 
   var els = {};
@@ -156,7 +157,8 @@
         'Content-Type': 'application/json',
         'X-ATS-Chat-Nonce': config.nonce
       },
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      cache: 'no-store'
     };
 
     if (payload) {
@@ -455,11 +457,14 @@
       return;
     }
 
-    var since = initialLoad ? 0 : Math.max(0, (state.lastMessageTs || 0) - 1);
+    state.pollCount += 1;
+    var fullSync = !!initialLoad || (state.pollCount % 10 === 0);
+    var since = fullSync ? 0 : Math.max(0, (state.lastMessageTs || 0) - 1);
     var query = '/messages?conversation_id=' + encodeURIComponent(state.conversationId) +
       '&visitor_id=' + encodeURIComponent(state.visitorId) +
       '&nonce=' + encodeURIComponent(config.nonce) +
-      '&since=' + encodeURIComponent(since);
+      '&since=' + encodeURIComponent(since) +
+      '&_=' + encodeURIComponent(Date.now());
 
     api(query, 'GET')
       .then(function (res) {
@@ -480,6 +485,11 @@
       })
       .catch(function (err) {
         console.error('[ATS Chat] messages error:', err.message);
+        if (String(err.message || '').toLowerCase().indexOf('conversation access denied') !== -1) {
+          sendPresence().then(function () {
+            pollMessages(true);
+          });
+        }
       });
   }
 

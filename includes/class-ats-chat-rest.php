@@ -149,7 +149,7 @@ class ATS_Chat_REST {
 	public function public_nonce( $request ) {
 		unset( $request );
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'nonce'          => wp_create_nonce( 'ats_chat_public' ),
 				'server_ts'      => time(),
@@ -210,7 +210,7 @@ class ATS_Chat_REST {
 		$agents_online = ATS_Chat_DB::has_online_agents();
 		$diag         = ATS_Chat_DB::diagnostics();
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'visitor_id'             => $visitor['visitor_id'],
 				'conversation_id'        => $conversation['conversation_id'],
@@ -285,7 +285,7 @@ class ATS_Chat_REST {
 			$response['ai_message'] = $this->format_message( $ai_message );
 		}
 
-		return rest_ensure_response( $response );
+		return $this->no_cache_response( $response );
 	}
 
 	/**
@@ -343,7 +343,7 @@ class ATS_Chat_REST {
 		$msg_text     = sprintf( 'Offline lead from %s (%s): %s', $name, $email, $message );
 		ATS_Chat_DB::add_message( $conversation['conversation_id'], 'visitor', 'text', $msg_text, array( 'is_lead' => true ) );
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'success'         => true,
 				'visitor_id'      => $visitor_id,
@@ -404,7 +404,7 @@ class ATS_Chat_REST {
 			)
 		);
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'success'        => true,
 				'actor'          => $actor,
@@ -457,7 +457,7 @@ class ATS_Chat_REST {
 			);
 		}
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'visitors'          => $data,
 				'online_agents'     => count( ATS_Chat_DB::get_online_agents() ),
@@ -524,7 +524,7 @@ class ATS_Chat_REST {
 			);
 		}
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'conversation' => array(
 					'conversation_id' => $conversation['conversation_id'],
@@ -594,7 +594,7 @@ class ATS_Chat_REST {
 
 		$typing = ATS_Chat_DB::get_typing_state( $conversation_id, $is_agent ? 'agent' : 'visitor' );
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'messages'      => $formatted,
 				'typing'        => $typing,
@@ -654,7 +654,7 @@ class ATS_Chat_REST {
 			$message = ATS_Chat_DB::add_message( $conversation_id, 'agent', 'text', $text, array() );
 		}
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'message'        => $this->format_message( $message ),
 				'server_ts'      => time(),
@@ -679,7 +679,7 @@ class ATS_Chat_REST {
 		$query   = sanitize_text_field( (string) $request->get_param( 'q' ) );
 		$results = ATS_Chat_WooCommerce::search_products( $query );
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'results'        => $results,
 				'server_ts'      => time(),
@@ -727,7 +727,7 @@ class ATS_Chat_REST {
 				)
 			);
 
-			return rest_ensure_response(
+			return $this->no_cache_response(
 				array(
 					'sent'           => true,
 					'message'        => $this->format_message( $message ),
@@ -738,7 +738,7 @@ class ATS_Chat_REST {
 			);
 		}
 
-		return rest_ensure_response(
+		return $this->no_cache_response(
 			array(
 				'sent'           => false,
 				'draft'          => $reply,
@@ -837,6 +837,22 @@ class ATS_Chat_REST {
 			'created_at'      => isset( $message['created_at'] ) ? sanitize_text_field( (string) $message['created_at'] ) : '',
 			'ts'              => isset( $message['ts'] ) ? absint( $message['ts'] ) : ( isset( $message['created_at'] ) ? strtotime( (string) $message['created_at'] ) : 0 ),
 		);
+	}
+
+	/**
+	 * Build no-cache REST response.
+	 *
+	 * @param array<string,mixed> $data Response data.
+	 * @return WP_REST_Response
+	 */
+	private function no_cache_response( $data ) {
+		$response = rest_ensure_response( $data );
+		if ( $response instanceof WP_REST_Response ) {
+			$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
+			$response->header( 'Pragma', 'no-cache' );
+			$response->header( 'Expires', '0' );
+		}
+		return $response;
 	}
 
 	/**
