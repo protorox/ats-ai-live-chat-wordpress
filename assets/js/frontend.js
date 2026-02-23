@@ -18,7 +18,9 @@
     typingCooldownTimer: null,
     agentsOnline: false,
     aiMode: 'off',
-    updateReloadScheduled: false
+    updateReloadScheduled: false,
+    presenceFailures: 0,
+    lastPresenceErrorAt: 0
   };
 
   var els = {};
@@ -113,7 +115,37 @@
       .replace(/'/g, '&#039;');
   }
 
-  function api(path, method, payload) {
+  function refreshPublicNonce() {
+    if (!restBase) {
+      return Promise.resolve(false);
+    }
+
+    return fetch(restBase + '/public-nonce?ts=' + Date.now(), {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store'
+    }).then(function (res) {
+      return res.text().then(function (raw) {
+        var json = {};
+        try {
+          json = raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          json = {};
+        }
+
+        if (!res.ok || !json || !json.nonce) {
+          return false;
+        }
+
+        config.nonce = json.nonce;
+        return true;
+      });
+    }).catch(function () {
+      return false;
+    });
+  }
+
+  function api(path, method, payload, retriedForNonce) {
     if (!restBase) {
       return Promise.reject(new Error('REST base URL is not configured.'));
     }
@@ -132,12 +164,31 @@
     }
 
     return fetch(restBase + path, opts).then(function (res) {
-      return res.json().then(function (json) {
-        if (!res.ok) {
-          var msg = (json && json.message) ? json.message : 'Request failed';
-          throw new Error(msg);
+      return res.text().then(function (raw) {
+        var json = {};
+        try {
+          json = raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          json = {};
         }
-        return json;
+
+        if (!res.ok) {
+          var code = (json && json.code) ? String(json.code) : '';
+          var msg = (json && json.message) ? json.message : 'Request failed';
+          var isNonceError = code === 'ats_chat_bad_nonce' || msg.toLowerCase().indexOf('invalid chat nonce') !== -1;
+
+          if (!retriedForNonce && isNonceError) {
+            return refreshPublicNonce().then(function (refreshed) {
+              if (refreshed) {
+                return api(path, method, payload, true);
+              }
+              throw new Error(msg);
+            });
+          }
+
+          throw new Error(msg + ' (HTTP ' + res.status + ')');
+        }
+        return json || {};
       });
     });
   }
@@ -363,6 +414,7 @@
         if (checkBuildVersion(res.plugin_version || '')) {
           return;
         }
+        state.presenceFailures = 0;
         if (res.visitor_id) {
           state.visitorId = res.visitor_id;
           setStorage('ats_chat_visitor_id', res.visitor_id);
@@ -390,7 +442,11 @@
       .catch(function (err) {
         // Keep the widget usable even if presence fails temporarily.
         console.error('[ATS Chat] presence error:', err.message);
-        showSystemNotice('Chat is having trouble connecting. Please refresh this page.');
+        state.presenceFailures += 1;
+        if (state.presenceFailures >= 2 && (Date.now() - state.lastPresenceErrorAt) > 30000) {
+          state.lastPresenceErrorAt = Date.now();
+          showSystemNotice('Chat is having trouble connecting. Please refresh this page.');
+        }
       });
   }
 

@@ -31,6 +31,16 @@ class ATS_Chat_REST {
 	public function register_routes() {
 		register_rest_route(
 			$this->namespace,
+			'/public-nonce',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'public_nonce' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
 			'/presence',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
@@ -126,6 +136,24 @@ class ATS_Chat_REST {
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'ai_reply' ),
 				'permission_callback' => array( $this, 'agent_permission' ),
+			)
+		);
+	}
+
+	/**
+	 * Get a fresh public nonce for visitor-side requests.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function public_nonce( $request ) {
+		unset( $request );
+
+		return rest_ensure_response(
+			array(
+				'nonce'          => wp_create_nonce( 'ats_chat_public' ),
+				'server_ts'      => time(),
+				'plugin_version' => ATS_CHAT_VERSION,
 			)
 		);
 	}
