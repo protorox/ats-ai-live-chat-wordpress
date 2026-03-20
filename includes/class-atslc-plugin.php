@@ -36,6 +36,13 @@ class ATSLC_Plugin {
 	private $public;
 
 	/**
+	 * GitHub updater runtime.
+	 *
+	 * @var ATSLC_GitHub_Updater
+	 */
+	private $updater;
+
+	/**
 	 * Get the singleton instance.
 	 *
 	 * @return ATSLC_Plugin
@@ -52,8 +59,9 @@ class ATSLC_Plugin {
 	 * Constructor.
 	 */
 	private function __construct() {
-		$this->admin  = new ATSLC_Admin();
-		$this->public = new ATSLC_Public();
+		$this->admin   = new ATSLC_Admin();
+		$this->public  = new ATSLC_Public();
+		$this->updater = new ATSLC_GitHub_Updater();
 
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 	}
